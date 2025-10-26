@@ -12,16 +12,16 @@ from tkinter import Tk, filedialog
 # ===============================
 # 📌 CONFIGURATION
 # ===============================
-VECTOR_DIM = 3072
-EMBED_MODEL = "text-embedding-3-large"
+VECTOR_DIM = 1536
+EMBED_MODEL = "text-embedding-3-small"
 BUCKET = "materials"
-BATCH_SIZE = 100            # Number of verses per embedding batch
+BATCH_SIZE = 100
 
 # ===============================
 # 🧪 TEST MODE CONFIG
 # ===============================
-TEST_MODE = False           # Set to True to process only a few entries
-MAX_TEST_ENTRIES = 5        # Number of entries to process in test mode
+TEST_MODE = False
+MAX_TEST_ENTRIES = 5
 
 # ===============================
 # 🔧 ENVIRONMENT VARIABLES
@@ -78,8 +78,8 @@ def embed_batch(texts: list[str]) -> list[list[float]]:
 def upload_batch(chunks: list[dict], embeddings: list[list[float]], file_path: str):
     payload = []
     for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-        if not embedding:
-            print(f"⚠️ Skipping chunk {idx} due to missing embedding")
+        if not embedding or "text" not in chunk or not chunk["text"].strip():
+            print(f"⚠️ Skipping chunk {idx} due to missing embedding or text")
             continue
         metadata = {
             "source_file": os.path.basename(file_path),
@@ -91,7 +91,7 @@ def upload_batch(chunks: list[dict], embeddings: list[list[float]], file_path: s
             "file_type": ".jsonl"
         }
         payload.append({
-            "content": chunk["text"],
+            "content": chunk["text"].strip(),
             "embedding": embedding,
             "metadata": metadata
         })
@@ -108,15 +108,21 @@ def process_jsonl_file(file_path: str):
     print(f"\n📘 Processing JSONL: {file_path}")
     upload_file_to_storage(file_path)
 
+    chunks = []
     with open(file_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+        for line in f:
+            try:
+                obj = json.loads(line)
+                if "text" in obj and obj["text"].strip():
+                    chunks.append(obj)
+                    if TEST_MODE and len(chunks) >= MAX_TEST_ENTRIES:
+                        break
+                else:
+                    print("⚠️ Skipping malformed or empty chunk")
+            except json.JSONDecodeError:
+                print("⚠️ Skipping invalid JSON line")
 
-    if TEST_MODE:
-        lines = lines[:MAX_TEST_ENTRIES]
-        print(f"🧪 Test mode ON — processing first {MAX_TEST_ENTRIES} entries")
-
-    chunks = [json.loads(line) for line in lines if "text" in json.loads(line)]
-    print(f"🧩 Total chunks: {len(chunks)}")
+    print(f"🧩 Total chunks to process: {len(chunks)}")
 
     with tqdm(total=len(chunks), desc="Embedding + Uploading", leave=False) as pbar:
         for i in range(0, len(chunks), BATCH_SIZE):

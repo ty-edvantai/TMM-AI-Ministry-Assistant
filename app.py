@@ -27,9 +27,9 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
-EMBED_MODEL = "text-embedding-3-large"
+EMBED_MODEL = "text-embedding-3-small"
 CHAT_MODEL  = "gpt-4o-mini"
-VECTOR_DIM  = 3072
+VECTOR_DIM  = 1536
 TOP_K = 10
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 100

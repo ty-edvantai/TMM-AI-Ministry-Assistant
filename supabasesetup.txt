@@ -127,6 +127,43 @@ begin
 end;
 $$;
 
+# Filtered match documents function
+CREATE OR REPLACE FUNCTION match_documents_filtered(
+  query_embedding vector,
+  match_count integer,
+  source_filter text[]
+)
+RETURNS TABLE (
+  id uuid,
+  content text,
+  metadata jsonb,
+  source_file text,
+  similarity float
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- If no files selected, return empty
+  IF source_filter IS NULL OR array_length(source_filter, 1) = 0 THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    d.id,
+    d.content,
+    d.metadata,
+    d.metadata->>'source_file' AS source_file,
+    1 - (d.embedding <=> query_embedding) AS similarity
+  FROM documents d
+  WHERE (d.metadata->>'source_file') = ANY(source_filter)
+  ORDER BY d.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;
+
+
+
 # Make a user an admin
 update auth.users
 set raw_user_meta_data = jsonb_set(
