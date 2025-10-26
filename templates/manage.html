@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin Tools</title>
+<link rel="icon" href="/static/favicon.ico">
+
+<style>
+:root {
+  --cardinal:#990000; --gold:#ffd700; --ink:#222;
+  --muted:#777; --bg:#f8f8f8; --panel:#fff; --line:#e7e7e7;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+.frame{max-width:1100px;margin:28px auto;background:var(--panel);border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:22px;min-height:720px;display:flex;flex-direction:column;position:relative}
+h2{margin:0 0 8px;color:var(--cardinal)}
+.rule{height:2px;background:var(--gold);width:100%;margin:6px 0 18px;border-radius:2px}
+.drop{border:2px dashed #cfcfcf;border-radius:10px;padding:22px;text-align:center;background:#fafafa;margin-bottom:12px;transition:background .2s,border-color .2s}
+.drop.drag{border-color:var(--cardinal);background:#fff6f6}
+.btn{background:var(--cardinal);color:#fff;border:0;border-radius:8px;padding:9px 14px;font-size:.92rem;cursor:pointer;transition:opacity .2s,background .2s}
+.btn.secondary{background:#f3f3f3;color:#333}
+.btn.danger{background:#b11226}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.bar input[type="text"]{flex:1;border:1px solid #d5d5d5;border-radius:8px;padding:9px 12px}
+.progress{display:none;align-items:center;gap:10px;margin:8px 0}
+.progress .track{flex:1;height:10px;background:#eee;border-radius:8px;overflow:hidden}
+.progress .fill{height:100%;width:0;background:var(--cardinal);transition:width .15s linear}
+table{width:100%;border-collapse:collapse;border-radius:10px;overflow:hidden}
+thead{background:#f6f6f6}
+th,td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:.92rem}
+tbody tr:hover{background:#fff6f6}
+.muted{color:var(--muted)}
+.row-actions{display:flex;gap:8px;justify-content:flex-end}
+.notice {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--cardinal); color: #fff; padding: 10px 18px;
+  border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,.2);
+  opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+  font-size: 0.9rem; z-index: 1000;
+}
+.notice.show { opacity: 1; }
+#accessDenied {
+  margin: 80px auto; text-align: center; color: #990000;
+  font-size: 1.2rem; display: none;
+}
+tr.fade-in {animation: fadeIn .4s ease;}
+@keyframes fadeIn {from{opacity:0;}to{opacity:1;}}
+
+/* ---- Modal ---- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1500; opacity: 0; transition: opacity 0.2s ease;
+}
+.modal-backdrop.show { opacity: 1; }
+.modal {
+  background: var(--panel); border-radius: 10px; padding: 20px 26px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2); max-width: 400px; text-align: center;
+}
+.modal h3 { margin-top: 0; color: var(--cardinal); font-size: 1.1rem; }
+.modal p { font-size: 0.95rem; color: var(--ink); margin: 12px 0 18px; }
+.modal .actions { display: flex; justify-content: center; gap: 12px; }
+</style>
+</head>
+
+<body>
+
+{% include '_header.html' %}
+
+<div id="accessDenied">Access denied. Admin privileges required.</div>
+
+<div class="frame" id="manageFrame" style="display:none;flex-direction:row;align-items:flex-start;">
+  <!-- Sidebar -->
+  <aside style="width:220px;margin-right:24px;border-right:1px solid #eee;padding-right:18px;">
+    <h3 style="color:#990000;margin-top:0;">Admin Links</h3>
+    <ul style="list-style:none;padding:0;font-size:0.95rem;line-height:1.8;">
+      <li><a href="/manage" style="color:#222;text-decoration:none;">Manage Files</a></li>
+      <li><a href="/dashboard" style="color:#222;text-decoration:none;">Usage Dashboard</a></li>
+    </ul>
+  </aside>
+
+  <!-- Main content -->
+  <div style="flex:1;">
+    <h2>Manage Uploaded Materials</h2>
+    <div class="rule"></div>
+
+    <div id="drop" class="drop" ondrop="onDrop(event)" ondragover="onDrag(event)" ondragleave="onLeave(event)">
+      <div class="muted" style="margin-bottom:6px">Drag and drop your files here</div>
+      <div class="muted" style="margin-bottom:10px">or</div>
+      <input id="fileInput" type="file" multiple hidden />
+      <button class="btn" id="selectBtn" onclick="document.getElementById('fileInput').click()">Select Files</button>
+      <div style="margin-top:12px;font-size:0.9rem;color:#666;">
+        Supported filetypes: <strong>.pdf, .pptx, .docx</strong>
+      </div>
+    </div>
+
+    <div class="bar">
+      <input id="search" type="text" placeholder="Search files..."/>
+      <button id="deleteBtn" class="btn danger" disabled>Delete Selected</button>
+    </div>
+
+    <div class="progress" id="progress">
+      <span id="ptext" class="muted">Uploading…</span>
+      <div class="track"><div class="fill" id="pfill"></div></div>
+      <span id="pnum" class="muted">0%</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" id="selectAll"/></th>
+          <th>Name</th>
+          <th style="width:120px">Type</th>
+          <th style="width:220px">Date Added</th>
+          <th style="width:150px;text-align:right"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div> <!-- end main content -->
+</div> <!-- end frame -->
+
+<div id="notices"></div>
+<div id="modalRoot"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+const SUPABASE_URL = "{{ SUPABASE_URL }}";
+const SUPABASE_KEY = "{{ SUPABASE_ANON_KEY }}";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = s => document.querySelector(s);
+
+/* ---- Admin Check ---- */
+async function checkAdminAccess() {
+  const { data } = await supabase.auth.getUser();
+  const user = data?.user;
+  if (!user) { window.location.href = "/login"; return; }
+  const role = user.user_metadata?.role || user.app_metadata?.role;
+  if (role !== "admin") {
+    document.getElementById("accessDenied").style.display = "block";
+    return;
+  }
+  document.getElementById("manageFrame").style.display = "flex";
+  loadFiles();
+}
+checkAdminAccess();
+
+/* ---- Notifications ---- */
+function showNotice(msg, color="var(--cardinal)") {
+  const n = document.createElement('div');
+  n.className = 'notice show';
+  n.style.background = color;
+  n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(()=> n.remove(), 2500);
+}
+
+/* ---- Modal ---- */
+function confirmModal(title, message){
+  return new Promise(resolve=>{
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop show';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <h3>${title}</h3>
+      <p>${message}</p>
+      <div class="actions">
+        <button class="btn danger" id="confirmYes">Confirm</button>
+        <button class="btn secondary" id="confirmNo">Cancel</button>
+      </div>
+    `;
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+    backdrop.querySelector('#confirmYes').onclick = ()=>{ backdrop.remove(); resolve(true); };
+    backdrop.querySelector('#confirmNo').onclick = ()=>{ backdrop.remove(); resolve(false); };
+  });
+}
+
+/* ---- Progress ---- */
+function showProgress(name,pct){
+  const bar=$('#progress');
+  bar.style.display="flex";
+  $('#ptext').textContent=`Uploading ${name}`;
+  $('#pfill').style.width=`${pct}%`;
+  $('#pnum').textContent=`${Math.round(pct)}%`;
+  if(pct>=100) setTimeout(()=>{ bar.style.display="none"; $('#pfill').style.width="0%"; },600);
+}
+
+/* ---- Files ---- */
+let files = [];
+const selected = new Set();
+
+async function loadFiles(){
+  $('#tbody').innerHTML = `<tr><td colspan="5" class="muted">Loading…</td></tr>`;
+  const res = await fetch("/api/files");
+  files = await res.json();
+  renderFiles();
+}
+
+/* ---- Search debounce ---- */
+let searchTimer;
+$('#search').addEventListener('input', ()=>{
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(renderFiles, 200);
+});
+
+function renderFiles(){
+  const q = ($('#search').value||"").toLowerCase();
+  const tbody = $('#tbody');
+  tbody.innerHTML = "";
+  const filtered = files.filter(f => f.file_name.toLowerCase().includes(q));
+
+  if(filtered.length===0){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td></td><td class="muted" colspan="4">No files found.</td>`;
+    tbody.appendChild(tr);
+  } else {
+    filtered.forEach(f=>{
+      const checked = selected.has(f.file_name) ? "checked" : "";
+      const tr=document.createElement("tr");
+      tr.classList.add('fade-in');
+      tr.innerHTML=`
+        <td><input type="checkbox" class="rowcheck" data-name="${f.file_name}" ${checked}/></td>
+        <td title="${f.file_name}">${f.file_name}</td>
+        <td>${f.file_type || "—"}</td>
+        <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : "—"}</td>
+        <td class="row-actions">
+          <button class="btn danger" onclick="deleteFile('${f.file_name}')">Delete</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  $('#deleteBtn').disabled = selected.size===0;
+  const allChecks = tbody.querySelectorAll('.rowcheck');
+  $('#selectAll').checked = allChecks.length && [...allChecks].every(c=>c.checked);
+}
+
+/* ---- Selection ---- */
+$('#tbody').addEventListener('change', e=>{
+  if(e.target.classList.contains('rowcheck')){
+    const name=e.target.dataset.name;
+    if(e.target.checked) selected.add(name); else selected.delete(name);
+    renderFiles();
+  }
+});
+$('#selectAll').addEventListener('change', e=>{
+  const checks=$('#tbody').querySelectorAll('.rowcheck');
+  checks.forEach(c=>{
+    c.checked=e.target.checked;
+    if(e.target.checked) selected.add(c.dataset.name); else selected.delete(c.dataset.name);
+  });
+  renderFiles();
+});
+
+/* ---- Delete ---- */
+window.deleteFile = async function(name){
+  const confirm = await confirmModal("Confirm Deletion", `Delete "${name}"?`);
+  if(!confirm) return;
+  const { data } = await supabase.auth.getSession();
+  const jwt = data.session.access_token;
+  await fetch(`/delete/${encodeURIComponent(name)}`, {
+    method:"DELETE",
+    headers:{ Authorization: "Bearer " + jwt }
+  });
+  files = files.filter(f=>f.file_name!==name);
+  renderFiles();
+  showNotice(`${name} deleted`,"#b11226");
+}
+
+$('#deleteBtn').addEventListener('click', async ()=>{
+  if(selected.size===0) return;
+  const confirm = await confirmModal("Confirm Deletion", `Delete ${selected.size} selected file(s)?`);
+  if(!confirm) return;
+  const { data } = await supabase.auth.getSession();
+  const jwt = data.session.access_token;
+  await Promise.all([...selected].map(name =>
+    fetch(`/delete/${encodeURIComponent(name)}`,{
+      method:"DELETE",
+      headers:{ Authorization: "Bearer " + jwt }
+    })
+  ));
+  files = files.filter(f => !selected.has(f.file_name));
+  showNotice(`${selected.size} file(s) deleted`,"#b11226");
+  selected.clear();
+  renderFiles();
+});
+
+/* ---- Upload ---- */
+function onDrag(e){ e.preventDefault(); $('#drop').classList.add('drag'); }
+function onLeave(e){ e.preventDefault(); $('#drop').classList.remove('drag'); }
+function onDrop(e){
+  e.preventDefault(); onLeave(e);
+  const list=[...e.dataTransfer.files]; if(!list.length) return;
+  uploadFiles(list);
+}
+$('#fileInput').addEventListener('change', async e=>{
+  const list=[...e.target.files]; e.target.value="";
+  if(!list.length) return;
+  await uploadFiles(list);
+});
+
+/* ---- Improved Uploads with Polling Fix ---- */
+async function uploadFiles(list){
+  $('#selectBtn').disabled = true;
+  showNotice(`Uploading ${list.length} file(s)...`);
+
+  const tbody = $('#tbody');
+  list.forEach(f=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td></td><td colspan="4" class="muted">Uploading ${f.name}...</td>`;
+    tr.dataset.tempRow = f.name;
+    tbody.appendChild(tr);
+  });
+
+  const limit = 3;
+  const queue = [...list];
+  const workers = Array.from({ length: limit }, async function worker(){
+    while(queue.length){
+      const f = queue.shift();
+      if(f) await uploadFile(f);
+    }
+  });
+  await Promise.all(workers);
+
+  // Wait briefly to let backend commit
+  await new Promise(r => setTimeout(r, 1200));
+  await refreshAfterUpload();
+
+  $('#selectBtn').disabled = false;
+  showNotice(`All uploads complete`, "#198754");
+
+  document.querySelector('.frame').scrollTo({
+    top: document.querySelector('.frame').scrollHeight,
+    behavior: 'smooth'
+  });
+}
+
+async function refreshAfterUpload(){
+  try {
+    const res = await fetch("/api/files?_t=" + Date.now()); // cache-busting
+    files = await res.json();
+    renderFiles();
+  } catch (err) {
+    console.error("refreshAfterUpload failed", err);
+  }
+}
+
+async function uploadFile(file){
+  const { data } = await supabase.auth.getSession();
+  const jwt = data.session.access_token;
+  return new Promise(resolve=>{
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST","/upload");
+    xhr.setRequestHeader("Authorization","Bearer "+jwt);
+    xhr.timeout = 120000;
+    xhr.upload.onprogress = e=>{
+      if(e.lengthComputable) showProgress(file.name,(e.loaded/e.total)*100);
+    };
+    xhr.onload = async ()=>{
+      if(xhr.status===200){
+        showNotice(`${file.name} uploaded`,"#198754");
+      } else {
+        await new Promise(r=>setTimeout(r,2000));
+        const res = await fetch("/api/files");
+        const newList = await res.json();
+        if(newList.some(f=>f.file_name===file.name))
+          showNotice(`${file.name} uploaded (delayed sync)`,"#198754");
+        else
+          showNotice(`Upload failed: ${file.name}`,"#b11226");
+      }
+      resolve();
+    };
+    xhr.onerror = ()=>{ showNotice(`Error uploading ${file.name}`,"#b11226"); resolve(); };
+    xhr.ontimeout = ()=>{ showNotice(`${file.name} timed out`,"#b11226"); resolve(); };
+    const form=new FormData();
+    form.append("file", file);
+    xhr.send(form);
+  });
+}
+</script>
+</body>
+</html>
