@@ -1,1 +1,23 @@
-Main blue #034aad
+Primary (brand)
+#034aad — main blue
+
+Secondary (backgrounds, sections)
+#e0e6f0 — light gray-blue
+
+Accent (buttons, highlights)
+#1a73e8 — bright accent blue
+
+Text and headers
+#0b1e39 — deep navy for strong contrast
+#2b3f5c — muted slate for secondary text
+
+Borders, dividers, subtle UI
+#607d9c — neutral cool gray-blue
+
+Hover/interactive states
+lighten primary: #0560d6
+darken accent: #155ab5
+
+Optional alternative background
+#ffffff — clean base layer
+#f8f9fb — soft white-gray variation
