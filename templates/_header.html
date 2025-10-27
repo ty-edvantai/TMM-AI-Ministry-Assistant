@@ -10,7 +10,7 @@ header {
   border-bottom: 4px solid #2b3f5c;
   flex-shrink: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: flex-start; /* keep global alignment same */
   justify-content: space-between;
   width: 100%;
   box-sizing: border-box;
@@ -35,6 +35,14 @@ header p {
   font-size: 0.95rem;
   opacity: 0.9;
   font-weight: 400;
+}
+
+/* center only the left-hand block vertically */
+.header-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 70%;
 }
 
 .engineered-by {
@@ -125,7 +133,7 @@ header p {
 </style>
 
 <header>
-  <div style="max-width: 70%;">
+  <div class="header-left">
     <h1>TMM AI Ministry Assistant</h1>
     <p>Scriptural insight. Spiritual clarity. Always grounded in the Word.</p>
   </div>
