@@ -97,6 +97,16 @@ for insert
 to service_role
 with check (true);
 
+-- Create a row-level security policy to allow read access for authenticated users
+CREATE POLICY "allow read for authenticated users"
+ON public.rag_query_history
+FOR SELECT
+TO public
+USING (
+  true
+);
+
+
 # Match_documents function
 create or replace function public.match_documents (
   query_embedding vector,
